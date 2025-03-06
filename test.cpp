@@ -8,7 +8,7 @@
 
 using namespace std;
 
-// Tiền khai báo các lớp để sử dụng trong chuyển đổi
+// Tiền khai báo các lớp (để hỗ trợ chuyển đổi qua lại)
 class CMYK;
 class YIQ;
 class HSV;
@@ -20,23 +20,24 @@ class YUV;
 class YCbCr;
 class ICtCp;
 
+// Lớp RGB đại diện theo chuẩn sRGB (gamma nén)
 class RGB {
 public:
-    double r, g, b; // Giá trị chuẩn hóa [0,1]
-
+    double r, g, b; // Giá trị chuẩn hoá [0,1]
+    
     RGB(double _r = 0, double _g = 0, double _b = 0) : r(_r), g(_g), b(_b) {}
-
-    // Các phương thức chuyển đổi
+    
+    // Các phương thức chuyển đổi từ RGB sang các không gian màu khác
     CMYK toCMYK() const;
     YIQ toYIQ() const;
     HSV toHSV() const;
     HSL toHSL() const;
-    XYZ toXYZ() const;  // Sử dụng không gian sRGB tuyến tính
+    XYZ toXYZ() const;  // Sử dụng RGB tuyến tính (sau khi giải nén gamma)
     Lab toLab() const;  // Qua XYZ
     ICtCp toICtCp() const; // Phiên bản đơn giản (stub)
     YUV toYUV() const;
     
-    // Hàm xử lý gamma cho sRGB
+    // Các hàm xử lý gamma cho sRGB
     RGB toLinear_sRGB() const;
     RGB linearTo_sRGB() const;
     
@@ -45,12 +46,14 @@ public:
     RGB linearTo_AdobeRGB() const;
 };
 
+// Các lớp khác
+
 class CMYK {
 public:
     double c, m, y, k;
     CMYK(double _c = 0, double _m = 0, double _y = 0, double _k = 0)
         : c(_c), m(_m), y(_y), k(_k) {}
-
+        
     RGB toRGB() const;
 };
 
@@ -59,7 +62,7 @@ public:
     double y, i, q;
     YIQ(double _y = 0, double _i = 0, double _q = 0)
         : y(_y), i(_i), q(_q) {}
-
+        
     RGB toRGB() const;
 };
 
@@ -68,7 +71,7 @@ public:
     double h, s, v;
     HSV(double _h = 0, double _s = 0, double _v = 0)
         : h(_h), s(_s), v(_v) {}
-
+        
     RGB toRGB() const;
 };
 
@@ -77,7 +80,7 @@ public:
     double h, s, l;
     HSL(double _h = 0, double _s = 0, double _l = 0)
         : h(_h), s(_s), l(_l) {}
-
+        
     RGB toRGB() const;
 };
 
@@ -86,7 +89,7 @@ public:
     double x, y, z;
     XYZ(double _x = 0, double _y = 0, double _z = 0)
         : x(_x), y(_y), z(_z) {}
-
+        
     RGB toRGB() const;
 };
 
@@ -95,7 +98,7 @@ public:
     double L, a, b;
     Lab(double _L = 0, double _a = 0, double _b = 0)
         : L(_L), a(_a), b(_b) {}
-
+        
     XYZ toXYZ() const;
     RGB toRGB() const; // Qua XYZ
 };
@@ -105,8 +108,8 @@ public:
     double L, C, H;
     LCH(double _L = 0, double _C = 0, double _H = 0)
         : L(_L), C(_C), H(_H) {}
-
-    // Lưu ý: hàm này trả về Lab
+        
+    // Hàm chuyển đổi: LCH -> Lab -> RGB
     Lab toLab() const;
 };
 
@@ -115,7 +118,7 @@ public:
     double y, u, v;
     YUV(double _y = 0, double _u = 0, double _v = 0)
         : y(_y), u(_u), v(_v) {}
-
+        
     RGB toRGB() const;
 };
 
@@ -124,7 +127,7 @@ public:
     double y, cb, cr;
     YCbCr(double _y = 0, double _cb = 0, double _cr = 0)
         : y(_y), cb(_cb), cr(_cr) {}
-
+        
     RGB toRGB() const;
 };
 
@@ -133,17 +136,17 @@ public:
     double I, Ct, Cp;
     ICtCp(double _I = 0, double _Ct = 0, double _Cp = 0)
         : I(_I), Ct(_Ct), Cp(_Cp) {}
-
+        
     RGB toRGB() const;
 };
 
-//----------------- TRIỂN KHAI HÀM THÀNH VIÊN -----------------//
+//-------------------- TRIỂN KHAI HÀM THÀNH VIÊN --------------------//
 
 // 1. RGB ↔ CMYK
 CMYK RGB::toCMYK() const {
     double K = 1 - max({r, g, b});
     double c, m, y;
-    if (fabs(K - 1.0) < 1e-6) { // Nếu màu đen hoàn toàn
+    if (fabs(K - 1.0) < 1e-6) { // màu đen hoàn toàn
         c = m = y = 0;
     } else {
         c = (1 - r - K) / (1 - K);
@@ -260,7 +263,7 @@ RGB HSL::toRGB() const {
     return RGB(r_prime + m, g_prime + m, b_prime + m);
 }
 
-// 5. Xử lý gamma cho sRGB
+// 5. Hàm xử lý gamma cho sRGB: chuyển từ gamma nén sang tuyến tính
 RGB RGB::toLinear_sRGB() const {
     auto comp = [](double channel) -> double {
         return (channel <= 0.04045) ? channel / 12.92
@@ -269,6 +272,7 @@ RGB RGB::toLinear_sRGB() const {
     return RGB(comp(r), comp(g), comp(b));
 }
 
+// Ngược lại: từ RGB tuyến tính sang sRGB gamma nén
 RGB RGB::linearTo_sRGB() const {
     auto comp = [](double channel) -> double {
         return (channel <= 0.0031308) ? 12.92 * channel
@@ -277,7 +281,7 @@ RGB RGB::linearTo_sRGB() const {
     return RGB(comp(r), comp(g), comp(b));
 }
 
-// Adobe RGB (gamma ~2.2)
+// Adobe RGB (giả sử gamma ~2.2)
 RGB RGB::toLinear_AdobeRGB() const {
     return RGB(pow(r, 2.2), pow(g, 2.2), pow(b, 2.2));
 }
@@ -286,8 +290,7 @@ RGB RGB::linearTo_AdobeRGB() const {
     return RGB(pow(r, 1.0 / 2.2), pow(g, 1.0 / 2.2), pow(b, 1.0 / 2.2));
 }
 
-// 6. RGB → XYZ (sử dụng ma trận chuyển đổi cho sRGB với điểm trắng D65)
-// Chuyển trước sang RGB tuyến tính
+// 6. RGB → XYZ (chuyển trước sang RGB tuyến tính)
 XYZ RGB::toXYZ() const {
     RGB lin = this->toLinear_sRGB();
     double X = lin.r * 0.4124564 + lin.g * 0.3575761 + lin.b * 0.1804375;
@@ -304,7 +307,7 @@ RGB XYZ::toRGB() const {
     return lin.linearTo_sRGB();
 }
 
-// 7. Chuyển đổi giữa XYZ và Lab theo CIE (điểm trắng D65)
+// 7. Chuyển đổi giữa XYZ và Lab (theo CIE, dùng điểm trắng D65)
 static double f_xyz(double t) {
     return (t > 0.008856) ? cbrt(t) : 7.787 * t + 16.0 / 116;
 }
@@ -384,7 +387,7 @@ RGB YUV::toRGB() const {
     return RGB(R, G, B);
 }
 
-// 10. RGB ↔ YCbCr (phiên bản normalized, giá trị [0,1])
+// 10. RGB ↔ YCbCr (normalized, giá trị [0,1])
 YCbCr RGB_to_YCbCr_normalized(const RGB &rgb) {
     double R = rgb.r, G = rgb.g, B = rgb.b;
     double Y  = 0.299 * R + 0.587 * G + 0.114 * B;
@@ -417,124 +420,220 @@ RGB ICtCp::toRGB() const {
     return RGB(R, G, B);
 }
 
-//----------------- GIAO DIỆN NHẬP LIỆU -----------------//
+//-------------------- HÀM HỖ TRỢ CHUYỂN ĐỔI GIỮA CÁC MÔ HÌNH --------------------//
 
-void menu() {
-    cout << "\n---------------- CHUONG TRINH CHUYEN DOI MAU ----------------\n";
-    cout << "Chon phep chuyen doi:\n";
-    cout << "1. RGB -> CMYK\n";
-    cout << "2. RGB -> YIQ\n";
-    cout << "3. RGB -> HSV\n";
-    cout << "4. RGB -> HSL\n";
-    cout << "5. RGB -> Lab\n";
-    cout << "6. Lab -> LCH\n";
-    cout << "7. RGB -> YUV\n";
-    cout << "8. RGB -> YCbCr (normalized)\n";
-    cout << "9. RGB -> ICtCp (stub)\n";
-    cout << "0. Thoat\n";
-    cout << "--------------------------------------------------------------\n";
-    cout << "Nhap lua chon: ";
+// Danh sách mã cho các mô hình màu:
+// 1: RGB
+// 2: CMYK
+// 3: YIQ
+// 4: HSV
+// 5: HSL
+// 6: Lab
+// 7: LCH
+// 8: YUV
+// 9: YCbCr
+// 10: Grayscale
+// 11: XYZ
+// 12: ICtCp
+// 13: sRGB (nhập như RGB)
+// 14: Adobe RGB
+
+// Hàm nhập màu theo mô hình nguồn và chuyển về RGB (chuẩn sRGB gamma nén)
+RGB inputColorFromModel(int modelChoice) {
+    double a, b, c, d;
+    switch (modelChoice) {
+        case 1: // RGB
+        case 13: { // sRGB
+            cout << "Nhap gia tri R, G, B (0 -> 1): ";
+            cin >> a >> b >> c;
+            return RGB(a, b, c);
+        }
+        case 2: { // CMYK
+            cout << "Nhap gia tri C, M, Y, K (0 -> 1): ";
+            cin >> a >> b >> c >> d;
+            return CMYK(a, b, c, d).toRGB();
+        }
+        case 3: { // YIQ
+            cout << "Nhap gia tri Y, I, Q: ";
+            cin >> a >> b >> c;
+            return YIQ(a, b, c).toRGB();
+        }
+        case 4: { // HSV
+            cout << "Nhap gia tri H (0->360), S, V (0->1): ";
+            cin >> a >> b >> c;
+            return HSV(a, b, c).toRGB();
+        }
+        case 5: { // HSL
+            cout << "Nhap gia tri H (0->360), S, L (0->1): ";
+            cin >> a >> b >> c;
+            return HSL(a, b, c).toRGB();
+        }
+        case 6: { // Lab
+            cout << "Nhap gia tri L, a, b: ";
+            cin >> a >> b >> c;
+            return Lab(a, b, c).toRGB();
+        }
+        case 7: { // LCH
+            cout << "Nhap gia tri L, C, H (0->360): ";
+            cin >> a >> b >> c;
+            return LCH(a, b, c).toLab().toRGB();
+        }
+        case 8: { // YUV
+            cout << "Nhap gia tri Y, U, V: ";
+            cin >> a >> b >> c;
+            return YUV(a, b, c).toRGB();
+        }
+        case 9: { // YCbCr
+            cout << "Nhap gia tri Y, Cb, Cr (0->1): ";
+            cin >> a >> b >> c;
+            return YCbCr(a, b, c).toRGB();
+        }
+        case 10: { // Grayscale
+            cout << "Nhap gia tri Grayscale (0->1): ";
+            cin >> a;
+            return RGB(a, a, a);
+        }
+        case 11: { // XYZ
+            cout << "Nhap gia tri X, Y, Z: ";
+            cin >> a >> b >> c;
+            return XYZ(a, b, c).toRGB();
+        }
+        case 12: { // ICtCp
+            cout << "Nhap gia tri I, Ct, Cp: ";
+            cin >> a >> b >> c;
+            return ICtCp(a, b, c).toRGB();
+        }
+        case 14: { // Adobe RGB
+            cout << "Nhap gia tri R, G, B theo Adobe RGB (0->1): ";
+            cin >> a >> b >> c;
+            // Chuyển từ Adobe RGB gamma sang RGB sRGB bằng cách:
+            RGB adobe(a, b, c);
+            RGB linearAdb = adobe.toLinear_AdobeRGB();
+            // Giả sử nội bộ chúng ta dùng sRGB, chuyển từ tuyến tính sang sRGB:
+            return linearAdb.linearTo_sRGB();
+        }
+        default:
+            return RGB();
+    }
+}
+
+// Hàm chuyển đổi từ RGB (chuẩn sRGB) sang mô hình màu đích và in kết quả
+void outputColorToModel(int modelChoice, const RGB &color) {
+    switch (modelChoice) {
+        case 1: // RGB
+        case 13: { // sRGB
+            cout << "RGB: (" << color.r << ", " << color.g << ", " << color.b << ")\n";
+            break;
+        }
+        case 2: { // CMYK
+            CMYK cmyk = color.toCMYK();
+            cout << "CMYK: (" << cmyk.c << ", " << cmyk.m << ", " << cmyk.y << ", " << cmyk.k << ")\n";
+            break;
+        }
+        case 3: { // YIQ
+            YIQ yiq = color.toYIQ();
+            cout << "YIQ: (" << yiq.y << ", " << yiq.i << ", " << yiq.q << ")\n";
+            break;
+        }
+        case 4: { // HSV
+            HSV hsv = color.toHSV();
+            cout << "HSV: (" << hsv.h << ", " << hsv.s << ", " << hsv.v << ")\n";
+            break;
+        }
+        case 5: { // HSL
+            HSL hsl = color.toHSL();
+            cout << "HSL: (" << hsl.h << ", " << hsl.s << ", " << hsl.l << ")\n";
+            break;
+        }
+        case 6: { // Lab
+            Lab lab = color.toLab();
+            cout << "Lab: (" << lab.L << ", " << lab.a << ", " << lab.b << ")\n";
+            break;
+        }
+        case 7: { // LCH
+            Lab lab = color.toLab();
+            LCH lch = Lab_to_LCH(lab);
+            cout << "LCH: (" << lch.L << ", " << lch.C << ", " << lch.H << ")\n";
+            break;
+        }
+        case 8: { // YUV
+            YUV yuv = color.toYUV();
+            cout << "YUV: (" << yuv.y << ", " << yuv.u << ", " << yuv.v << ")\n";
+            break;
+        }
+        case 9: { // YCbCr
+            YCbCr ycbcr = RGB_to_YCbCr_normalized(color);
+            cout << "YCbCr (normalized): (" << ycbcr.y << ", " << ycbcr.cb << ", " << ycbcr.cr << ")\n";
+            break;
+        }
+        case 10: { // Grayscale
+            double gray = 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+            cout << "Grayscale: " << gray << "\n";
+            break;
+        }
+        case 11: { // XYZ
+            XYZ xyz = color.toXYZ();
+            cout << "XYZ: (" << xyz.x << ", " << xyz.y << ", " << xyz.z << ")\n";
+            break;
+        }
+        case 12: { // ICtCp
+            ICtCp ictcp = color.toICtCp();
+            cout << "ICtCp (stub): (" << ictcp.I << ", " << ictcp.Ct << ", " << ictcp.Cp << ")\n";
+            break;
+        }
+        case 14: { // Adobe RGB
+            // Chuyển từ sRGB (nội bộ) sang Adobe RGB:
+            RGB linear = color.toLinear_sRGB();
+            RGB adobe = linear.linearTo_AdobeRGB();
+            cout << "Adobe RGB: (" << adobe.r << ", " << adobe.g << ", " << adobe.b << ")\n";
+            break;
+        }
+        default:
+            cout << "Khong ro model nay.\n";
+    }
+}
+
+//-------------------- GIAO DIỆN NHẬP LIỆU CHÍNH --------------------//
+
+// Hiển thị danh sách các mô hình màu
+void showModelList() {
+    cout << " 1: RGB\n";
+    cout << " 2: CMYK\n";
+    cout << " 3: YIQ\n";
+    cout << " 4: HSV\n";
+    cout << " 5: HSL\n";
+    cout << " 6: Lab\n";
+    cout << " 7: LCH\n";
+    cout << " 8: YUV\n";
+    cout << " 9: YCbCr\n";
+    cout << "10: Grayscale\n";
+    cout << "11: XYZ\n";
+    cout << "12: ICtCp\n";
+    cout << "13: sRGB (nhap nhu RGB)\n";
+    cout << "14: Adobe RGB\n";
 }
 
 int main() {
-    int choice;
-    do {
-        menu();
-        cin >> choice;
-        if (cin.fail()) {
-            cin.clear();
-            cin.ignore(1000, '\n');
-            cout << "Nhap khong hop le. Vui long thu lai!\n";
-            continue;
-        }
-        
-        if (choice == 0) break;
-        
-        if (choice >= 1 && choice <= 9) {
-            double r, g, b;
-            Lab lab;
-            RGB rgb;
-            switch (choice) {
-                case 1: { // RGB -> CMYK
-                    cout << "Nhap gia tri RGB (0 -> 1): ";
-                    cin >> r >> g >> b;
-                    rgb = RGB(r, g, b);
-                    CMYK cmyk = rgb.toCMYK();
-                    cout << "CMYK: (" << cmyk.c << ", " << cmyk.m << ", " 
-                         << cmyk.y << ", " << cmyk.k << ")\n";
-                    break;
-                }
-                case 2: { // RGB -> YIQ
-                    cout << "Nhap gia tri RGB (0 -> 1): ";
-                    cin >> r >> g >> b;
-                    rgb = RGB(r, g, b);
-                    YIQ yiq = rgb.toYIQ();
-                    cout << "YIQ: (" << yiq.y << ", " << yiq.i << ", " << yiq.q << ")\n";
-                    break;
-                }
-                case 3: { // RGB -> HSV
-                    cout << "Nhap gia tri RGB (0 -> 1): ";
-                    cin >> r >> g >> b;
-                    rgb = RGB(r, g, b);
-                    HSV hsv = rgb.toHSV();
-                    cout << "HSV: (" << hsv.h << ", " << hsv.s << ", " << hsv.v << ")\n";
-                    break;
-                }
-                case 4: { // RGB -> HSL
-                    cout << "Nhap gia tri RGB (0 -> 1): ";
-                    cin >> r >> g >> b;
-                    rgb = RGB(r, g, b);
-                    HSL hsl = rgb.toHSL();
-                    cout << "HSL: (" << hsl.h << ", " << hsl.s << ", " << hsl.l << ")\n";
-                    break;
-                }
-                case 5: { // RGB -> Lab
-                    cout << "Nhap gia tri RGB (0 -> 1): ";
-                    cin >> r >> g >> b;
-                    rgb = RGB(r, g, b);
-                    Lab lab = rgb.toLab();
-                    cout << "Lab: (" << lab.L << ", " << lab.a << ", " << lab.b << ")\n";
-                    break;
-                }
-                case 6: { // Lab -> LCH
-                    cout << "Nhap gia tri Lab (L, a, b): ";
-                    cin >> lab.L >> lab.a >> lab.b;
-                    LCH lch = Lab_to_LCH(lab);
-                    cout << "LCH: (" << lch.L << ", " << lch.C << ", " << lch.H << ")\n";
-                    break;
-                }
-                case 7: { // RGB -> YUV
-                    cout << "Nhap gia tri RGB (0 -> 1): ";
-                    cin >> r >> g >> b;
-                    rgb = RGB(r, g, b);
-                    YUV yuv = rgb.toYUV();
-                    cout << "YUV: (" << yuv.y << ", " << yuv.u << ", " << yuv.v << ")\n";
-                    break;
-                }
-                case 8: { // RGB -> YCbCr normalized
-                    cout << "Nhap gia tri RGB (0 -> 1): ";
-                    cin >> r >> g >> b;
-                    rgb = RGB(r, g, b);
-                    YCbCr ycbcr = RGB_to_YCbCr_normalized(rgb);
-                    cout << "YCbCr (normalized): (" << ycbcr.y << ", " << ycbcr.cb 
-                         << ", " << ycbcr.cr << ")\n";
-                    break;
-                }
-                case 9: { // RGB -> ICtCp (stub)
-                    cout << "Nhap gia tri RGB (0 -> 1): ";
-                    cin >> r >> g >> b;
-                    rgb = RGB(r, g, b);
-                    ICtCp ictcp = rgb.toICtCp();
-                    cout << "ICtCp (stub): (" << ictcp.I << ", " << ictcp.Ct 
-                         << ", " << ictcp.Cp << ")\n";
-                    break;
-                }
-            }
-        } else {
-            cout << "Lua chon khong hop le! Vui long chon lai.\n";
-        }
-    } while (choice != 0);
+    int srcModel, tgtModel;
+    cout << "---------------- CHUONG TRINH CHUYEN DOI MAU ----------------\n";
     
-    cout << "Ket thuc chuong trinh.\n";
+    // Nhập mô hình màu nguồn
+    cout << "Chon mo hinh mau NGUON:\n";
+    showModelList();
+    cout << "Nhap lua chon: ";
+    cin >> srcModel;
+    
+    RGB canonical = inputColorFromModel(srcModel);
+    
+    // Nhập mô hình màu đích
+    cout << "\nChon mo hinh mau DICH:\n";
+    showModelList();
+    cout << "Nhap lua chon: ";
+    cin >> tgtModel;
+    
+    cout << "\nKET QUA CHUYEN DOI:\n";
+    outputColorToModel(tgtModel, canonical);
+    
+    cout << "-------------------------------------------------------------\n";
     return 0;
 }
